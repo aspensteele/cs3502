@@ -15,3 +15,6 @@ Unidirectional Pipe Resources in C
 4. Beej's Guide to Interprocess Communication
    Description: A comprehensive guide that covers various aspects of inter-process communication, including pipes.
    Link: https://beej.us/guide/bgipc/html/
+5. GeeksforGeeks- Command Line Arguments in C
+   Description: provides a comprehensive overview of how to handle command-line arguments in C programs
+   Link: https://www.geeksforgeeks.org/cpp/command-line-arguments-in-c-cpp/
