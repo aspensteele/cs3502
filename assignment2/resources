@@ -1,0 +1,20 @@
+Unidirectional Pipe Resources in C
+
+1. TutorialsPoint – Inter-Process Communication: Pipes
+   Description: This tutorial covers the basics of using pipes for inter-process communication in C, including how to set up a unidirectional pipe between a parent and child process.
+   Link: https://www.tutorialspoint.com/inter_process_communication/inter_process_communication_pipes.htm
+
+2. GeeksforGeeks – C Program to Demonstrate fork() and pipe()
+   Description: An example demonstrating how to use fork() and pipe() in C to establish communication between processes.
+   Link: https://www.geeksforgeeks.org/c/c-program-demonstrate-fork-and-pipe/
+
+3. Codequoi – Pipe: an Inter-Process Communication Method
+   Description: This article delves into the use of pipes for inter-process communication, providing a simple explanation and examples.
+   Link: https://www.codequoi.com/en/pipe-an-inter-process-communication-method/
+
+4. Beej's Guide to Interprocess Communication
+   Description: A comprehensive guide that covers various aspects of inter-process communication, including pipes.
+   Link: https://beej.us/guide/bgipc/html/
+5. GeeksforGeeks- Command Line Arguments in C
+   Description: provides a comprehensive overview of how to handle command-line arguments in C programs
+   Link: https://www.geeksforgeeks.org/cpp/command-line-arguments-in-c-cpp/
