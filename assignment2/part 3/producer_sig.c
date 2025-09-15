@@ -16,7 +16,7 @@ volatile sig_atomic_t total_chunks = 0;
 
 // Handlers
 void handle_sigint(int sig) {
-    shutdown_flag = 1; // graceful shutdown
+    shutdown_flag = 1; // shutdown
 }
 
 void handle_sigusr1(int sig) {
@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (stats_flag) {
-            fprintf(stderr, ">>> Producer Stats: Chunks=%d, Bytes=%d\n",
+            fprintf(stderr, "Producer Stats: Chunks=%d, Bytes=%d\n",
                     total_chunks, total_bytes);
             stats_flag = 0;
         }
