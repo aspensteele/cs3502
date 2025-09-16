@@ -20,6 +20,10 @@ int main(int argc, char *argv[]) {
 			 break;
 		    case 'b':	 
 			buffer_size = atoi(optarg);
+			if (buffer_size <= 0) {
+				fprintf(stderr, "Error: Buffer size must be positive\n");
+				return 1;
+			}
 		  	break;
 		    case 'v': 
 			verbose = 1; //Flag with no argument
@@ -38,7 +42,16 @@ int main(int argc, char *argv[]) {
 		return 1;
 		}
 	}
-	
+
+		if (verbose) {
+	    if (filename != NULL) {
+	        fprintf(stderr, "Producer: Reading from file '%s' with buffer size %d\n", 
+	                filename, buffer_size);
+	    } else {
+	        fprintf(stderr, "Producer: Reading from stdin with buffer size %d\n", buffer_size);
+	    }
+	}
+		
 	buffer = malloc(buffer_size); 
 	if (buffer == NULL) {
 	   fprintf(stderr, "Error: Failed to allocate memory for buffer\n");
@@ -48,11 +61,20 @@ int main(int argc, char *argv[]) {
 	return 1;
      }
 	
+	int chunk_count = 0;  
+	int total_bytes = 0; 
+	
 	while((bytes_read = fread(buffer, 1, buffer_size, input)) > 0) {
+		chunk_count++;          
+    	total_bytes += bytes_read;
 	   if (fwrite(buffer, 1, bytes_read, stdout) != bytes_read) {
 	       fprintf(stderr, "Error: Failed to write to stdout\n");
 	       break;
-	}
+		}
+		 if (verbose) {
+        fprintf(stderr, "Producer: Chunk %d - read %zu bytes (total: %d bytes)\n",
+                chunk_count, bytes_read, total_bytes);
+    	}
      }
 
     if (ferror(input)) {
