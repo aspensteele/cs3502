@@ -7,7 +7,7 @@
 int main(int argc, char *argv[]) {
 	FILE *input = stdin; 
 	int buffer_size = 4096;
-	char opt; 
+	int opt; 
 	int verbose = 0; 
 	char *filename = NULL;
 	char *buffer = NULL;
