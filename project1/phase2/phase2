@@ -1,3 +1,12 @@
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <time.h>
+#include <string.h> // For strerror()
+#include <errno.h> // For error codes
+
+
 // Add mutex to account structure
 typedef struct {
     int account_id;
