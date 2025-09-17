@@ -1,0 +1,15 @@
+void safe_transfer(int from_id, int to_id, double amount) {
+    // Always lock lower ID first
+    int first = (from_id < to_id) ? from_id : to_id;
+    int second = (from_id < to_id) ? to_id : from_id;
+
+    pthread_mutex_lock(&accounts[first].lock);
+    pthread_mutex_lock(&accounts[second].lock);
+
+    // Perform transfer
+    accounts[from_id].balance -= amount;
+    accounts[to_id].balance += amount;
+
+    pthread_mutex_unlock(&accounts[second].lock);
+    pthread_mutex_unlock(&accounts[first].lock);
+}
