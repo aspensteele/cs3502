@@ -1,3 +1,11 @@
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <time.h>
+#include <string.h> // For strerror()
+#include <errno.h> // For error codes
+
 void safe_transfer(int from_id, int to_id, double amount) {
     // Always lock lower ID first
     int first = (from_id < to_id) ? from_id : to_id;
