@@ -6,6 +6,11 @@
 #include <string.h> // For strerror()
 #include <errno.h> // For error codes
 
+#define NUM_ACCOUNTS 3 
+#define NUM_THREADS 2 //start with 2 and then change later
+#define TRANSACTIONS_PER_TELLER 30 
+#define INITIAL_BALANCE 1000.0 //starting balance per account
+
 // Shared data structure
 typedef struct {
     int account_id;
@@ -23,10 +28,23 @@ void* teller_thread(void* arg) {
     // Perform multiple transactions
     for (int i = 0; i < TRANSACTIONS_PER_TELLER; i++) {
         // Select random account
-        // Perform deposit or withdrawal
-        // THIS WILL HAVE RACE CONDITIONS!
+	int account_id = rand() % NUM_ACCOUNTS;
 
-        printf("Teller %d: Transaction %d\n", teller_id, i);
+	// Select a random amount to withdrawal or add 
+	double amount = (rand() % 100) + 1; 
+
+        // Perform deposit or withdrawal
+	if (rand() % 2 == 0) {
+	//unsafe deposit
+	accounts[account-id].balance += amount;
+	} else {
+        // THIS WILL HAVE RACE CONDITIONS!
+	if (accounts[account_id].balance >= amount) {
+	    accounts[account_id].balance -= amount;
+	}
+    }
+       	 accounts[account_id].transaction_count++; 
+	 printf("Teller %d: Transaction %d\n", teller_id, i);
     }
 
     return NULL;
