@@ -1,0 +1,22 @@
+//Phase 1- Show a race condition
+#include <stdio.h>
+#include <pthread.h>
+
+typedef struct {
+	int account_id;
+	double balance;
+} Account;
+
+//Global accounts array (shared resource)
+
+//Thread function
+void* teller_thread(void* arg) {
+	int teller_id = *(int*)arg; //cast void* to int* and dereference
+	
+	//perform multiple transactions
+	for (int i = 0; i < TRANSACTIONS_PER_TELLER; i++) {
+		// Select random account
+		// perform deposit or withdrawal
+		// THIS WILL HAVE RACE CONDITIONS!
+		
+		printf("Teller 
