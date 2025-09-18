@@ -2,11 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <unistd.h>   // for usleep
+#include <unistd.h>
 
 #define NUM_ACCOUNTS 1
 #define NUM_THREADS 3
-#define TRANSACTIONS_PER_TELLER 1
 #define INITIAL_BALANCE 1000.0
 
 // Shared data structure
@@ -22,27 +21,38 @@ Account accounts[NUM_ACCOUNTS];
 // Thread function
 void* teller_thread(void* arg) {
     int teller_id = *(int*)arg; 
-    unsigned int seed = time(NULL) + pthread_self();
-
-    int random_account = rand_r(&seed) % NUM_ACCOUNTS;
-    double depositAmount = 100; 
-    double withdrawAmount = 50;
-
-    // Random short pause to cause overlaps
-    usleep(rand_r(&seed) % 2000); // 0–2 ms pause
-
-    // Fixed roles: threads 0 & 1 deposit, thread 2 withdraws
+    
+    // Introduce a random delay to increase chance of race conditions
+    unsigned int seed = time(NULL) + teller_id;
+    usleep(rand_r(&seed) % 2000); // 0-2ms delay
+    
     if (teller_id == 0 || teller_id == 1) {
-        accounts[random_account].balance += depositAmount;
-        printf("Thread %d: Deposited %.2f (Balance now: %.2f)\n",
-               teller_id, depositAmount, accounts[random_account].balance);
+        // DEPOSIT - vulnerable to race conditions
+        double current_balance = accounts[0].balance;
+        printf("Thread %d: Read balance %.2f for deposit of 100.00\n", 
+               teller_id, current_balance);
+        
+        // Small delay to increase chance of context switch
+        usleep(rand_r(&seed) % 1000);
+        
+        accounts[0].balance = current_balance + 100.0;
+        printf("Thread %d: Deposited 100.00 (Balance now: %.2f)\n",
+               teller_id, accounts[0].balance);
     } else {
-        accounts[random_account].balance -= withdrawAmount;
-        printf("Thread %d: Withdrew %.2f (Balance now: %.2f)\n",
-               teller_id, withdrawAmount, accounts[random_account].balance);
+        // WITHDRAWAL - vulnerable to race conditions
+        double current_balance = accounts[0].balance;
+        printf("Thread %d: Read balance %.2f for withdrawal of 50.00\n", 
+               teller_id, current_balance);
+        
+        // Small delay to increase chance of context switch
+        usleep(rand_r(&seed) % 1000);
+        
+        accounts[0].balance = current_balance - 50.0;
+        printf("Thread %d: Withdrew 50.00 (Balance now: %.2f)\n",
+               teller_id, accounts[0].balance);
     }
-
-    accounts[random_account].transaction_count++;
+    
+    accounts[0].transaction_count++;
     return NULL;
 }
 
@@ -71,6 +81,17 @@ int main() {
     }
 
     printf("Final Balance: %.2f\n", accounts[0].balance);
+    
+    // Calculate what the balance should be without race conditions
+    double expected_balance = INITIAL_BALANCE + 100.0 + 100.0 - 50.0;
+    printf("Expected Balance: %.2f\n", expected_balance);
+    
+    if (accounts[0].balance != expected_balance) {
+        printf("RACE CONDITION DETECTED! Difference: %.2f\n", 
+               accounts[0].balance - expected_balance);
+    } else {
+        printf("No race condition occurred this time (try running again)\n");
+    }
+    
     return 0;
 }
-
