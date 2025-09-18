@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <unistd.h>   // for usleep
 
 #define NUM_ACCOUNTS 1
 #define NUM_THREADS 3
@@ -23,24 +24,25 @@ void* teller_thread(void* arg) {
     int teller_id = *(int*)arg; 
     unsigned int seed = time(NULL) + pthread_self();
 
-    for (int i = 0; i < TRANSACTIONS_PER_TELLER; i++) {
-        int random_account = rand_r(&seed) % NUM_ACCOUNTS; 
-        double depositAmount = 100; 
-        double withdrawAmount = 50;
+    int random_account = rand_r(&seed) % NUM_ACCOUNTS;
+    double depositAmount = 100; 
+    double withdrawAmount = 50;
 
-        // Fixed roles: threads 0 & 1 deposit, thread 2 withdraws
-        if (teller_id == 0 || teller_id == 1) {
-            accounts[random_account].balance += depositAmount;
-            printf("Thread %d: Deposited %.2f (Balance now: %.2f)\n",
-                   teller_id, depositAmount, accounts[random_account].balance);
-        } else {
-            accounts[random_account].balance -= withdrawAmount;
-            printf("Thread %d: Withdrew %.2f (Balance now: %.2f)\n",
-                   teller_id, withdrawAmount, accounts[random_account].balance);
-        }
+    // Random short pause to cause overlaps
+    usleep(rand_r(&seed) % 2000); // 0–2 ms pause
 
-        accounts[random_account].transaction_count++;
+    // Fixed roles: threads 0 & 1 deposit, thread 2 withdraws
+    if (teller_id == 0 || teller_id == 1) {
+        accounts[random_account].balance += depositAmount;
+        printf("Thread %d: Deposited %.2f (Balance now: %.2f)\n",
+               teller_id, depositAmount, accounts[random_account].balance);
+    } else {
+        accounts[random_account].balance -= withdrawAmount;
+        printf("Thread %d: Withdrew %.2f (Balance now: %.2f)\n",
+               teller_id, withdrawAmount, accounts[random_account].balance);
     }
+
+    accounts[random_account].transaction_count++;
     return NULL;
 }
 
