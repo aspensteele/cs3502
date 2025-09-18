@@ -5,7 +5,7 @@
 
 #define NUM_ACCOUNTS 1
 #define NUM_THREADS 3
-#define TRANSACTIONS_PER_TELLER 10
+#define TRANSACTIONS_PER_TELLER 1
 #define  INITIAL_BALANCE 1000.0
 
 // Shared data structure
@@ -28,21 +28,22 @@ void* teller_thread(void* arg) {
         // Select random account
 	int random_account = rand_r(&seed) % NUM_ACCOUNTS;
         // Perform deposit or withdrawal
-	int deposit = rand_r)&seed) % 2; // 0 = withdrawal 1= deposit
-	double amount = (rand_r(&seed) % 100) + 1; //$1-$100
+	int deposit = rand_r(&seed) % 2; // 0 = withdrawal 1= deposit
+	double depositAmount = 100; 
+	double withdrawAmount = 50;
 	
        // THIS WILL HAVE RACE CONDITIONS !
 	if (deposit) {
-	  accounts[random_amount].balance += amount;
+	  accounts[random_account].balance += depositAmount;
 	  printf("Thread %d: Deposited %.2f (Balance now: %.2f)\n",
-		teller_id,amount, accounts[random_account].balance);
+		teller_id,depositAmount, accounts[random_account].balance);
 	}
 	else {
-		accounts[random_account].balance -= amount;
+		accounts[random_account].balance -= withdrawAmount;
 		printf("Thread %d: Withdrew %.2f (Balance now: %.2f)\n",
-		teller_id, amount, accounts[random_account].balance);
+		teller_id,withdrawAmount, accounts[random_account].balance);
 	}
-	accounts[random_account].transaction_count++:
+	accounts[random_account].transaction_count++;
        // printf("Teller %d: Transaction %d\n", teller_id, i);
     }
 
