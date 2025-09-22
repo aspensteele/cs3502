@@ -59,19 +59,17 @@ void cleanup_accounts() {
     }
 }
 
-// Thread function - FIXED: Pass thread ID by value, not reference
 void* teller_thread(void* arg) {
-    // FIX: Cast directly to avoid race condition on thread_ids array
     long teller_id = (long)arg;
     unsigned int seed = time(NULL) + teller_id;
     
     for (int i = 0; i < TRANSACTIONS_PER_TELLER; i++) {
-        usleep(rand_r(&seed) % 10000); // Random pause
+        usleep(rand_r(&seed) % 10000);
         
-        // First 5 threads deposit, last 5 withdraw
-        if (teller_id < 5) {
+        // FIX: Use modulo to split threads evenly between deposit/withdraw
+        if (teller_id % 2 == 0) {  // Even threads deposit
             deposit(0, 100.0, teller_id + 1);
-        } else {
+        } else {                   // Odd threads withdraw
             withdraw(0, 50.0, teller_id + 1);
         }
     }
@@ -102,7 +100,11 @@ int main() {
     printf("Total transactions: %d\n", accounts[0].transaction_count);
     
     // Calculate expected: 5 threads * 5 transactions * $100 - 5 threads * 5 transactions * $50
-    double expected_balance = INITIAL_BALANCE + (5 * 5 * 100.0) - (5 * 5 * 50.0);
+    int deposit_threads = (NUM_THREADS + 1) / 2;  // Even threads deposit (0, 2, 4...)
+    int withdraw_threads = NUM_THREADS / 2;       // Odd threads withdraw (1, 3, 5...)
+    double expected_balance = INITIAL_BALANCE + 
+                             (deposit_threads * TRANSACTIONS_PER_TELLER * 100.0) - 
+                             (withdraw_threads * TRANSACTIONS_PER_TELLER * 50.0);
     
     if (accounts[0].balance == expected_balance) {
         printf("SUCCESS! Balance matches expected: %.2f\n", expected_balance);
