@@ -36,30 +36,36 @@ void* teller_thread(void* arg) {
         // Select random account 
         int random_account = rand_r(&seed) % NUM_ACCOUNTS;
 
-        // THIS WILL HAVE RACE CONDITIONS!
+        double amount;
         if (teller_id % 2 == 0) {
             // Even threads deposit
-            double amount = (rand_r(&seed) % 901) + 100; // random 100–1000
+            amount = (rand_r(&seed) % 901) + 100; // random 100–1000
             double current_balance = accounts[random_account].balance;
-            usleep(rand_r(&seed) % 5000);
+            usleep(rand_r(&seed) % 5000); // simulate overlap
             accounts[random_account].balance = current_balance + amount;
 
-            // Track for expected balance
+            // Track expected safely
             __sync_fetch_and_add((long long*)&total_deposits, (long long)amount);
 
-            printf("Teller %d: Transaction %d - Depositing %.2f\n", teller_id, i + 1, amount);
+            printf("Teller %d: Transaction %d - Depositing %.2f | Actual balance: %.2f\n",
+                   teller_id, i + 1, amount, accounts[random_account].balance);
         } else {
             // Odd threads withdraw
-            double amount = (rand_r(&seed) % 451) + 50; // random 50–500
+            amount = (rand_r(&seed) % 451) + 50; // random 50–500
             double current_balance = accounts[random_account].balance;
-            usleep(rand_r(&seed) % 5000);
+            usleep(rand_r(&seed) % 5000); // simulate overlap
             accounts[random_account].balance = current_balance - amount;
 
-            // Track for expected balance
+            // Track expected safely
             __sync_fetch_and_add((long long*)&total_withdrawals, (long long)amount);
 
-            printf("Teller %d: Transaction %d - Withdrawing %.2f\n", teller_id, i + 1, amount);
+            printf("Teller %d: Transaction %d - Withdrawing %.2f | Actual balance: %.2f\n",
+                   teller_id, i + 1, amount, accounts[random_account].balance);
         }
+
+        // Show running expected vs actual
+        double expected_so_far = INITIAL_BALANCE + total_deposits - total_withdrawals;
+        printf("   >>> Expected balance so far: %.2f\n", expected_so_far);
 
         accounts[random_account].transaction_count++;
     }
@@ -68,7 +74,6 @@ void* teller_thread(void* arg) {
 }
 
 int main() {
-    // Creating threads
     pthread_t threads[NUM_THREADS];
     int thread_ids[NUM_THREADS];
 
@@ -107,3 +112,4 @@ int main() {
 
     return 0;
 }
+
