@@ -19,6 +19,9 @@ typedef struct {
 // Global accounts array (shared resource)
 Account accounts[NUM_ACCOUNTS];
 
+// Track what the expected balance should be (for comparison)
+double expected_total_balance;
+
 // Thread function
 void* teller_thread(void* arg) {
     int teller_id = *(int*)arg; // Cast void* to int* and dereference
@@ -48,6 +51,9 @@ void* teller_thread(void* arg) {
             accounts[account_id].balance = old_balance + amount;
             accounts[account_id].transaction_count++;
             
+            // Track expected balance change (this should be thread-safe for demonstration)
+            expected_total_balance += amount;
+            
         } else {
             // Withdraw
             printf("Teller %d: Transaction %d - Withdrawing $%.2f from Account %d\n", 
@@ -59,6 +65,9 @@ void* teller_thread(void* arg) {
                 usleep(100); // Small delay to increase chance of race condition
                 accounts[account_id].balance = old_balance - amount;
                 accounts[account_id].transaction_count++;
+                
+                // Track expected balance change
+                expected_total_balance -= amount;
             } else {
                 printf("Teller %d: Insufficient funds in Account %d\n", teller_id, account_id);
             }
@@ -81,6 +90,9 @@ int main() {
         accounts[i].balance = INITIAL_BALANCE;
         accounts[i].transaction_count = 0;
     }
+    
+    // Initialize expected balance tracker
+    expected_total_balance = NUM_ACCOUNTS * INITIAL_BALANCE;
     
     // Print initial balances
     printf("Initial balances:\n");
@@ -116,12 +128,16 @@ int main() {
     }
     
     printf("\nTotal balance: $%.2f\n", total_balance);
-    printf("Expected total: $%.2f\n", NUM_ACCOUNTS * INITIAL_BALANCE);
+    printf("Expected total: $%.2f\n", expected_total_balance);
+    printf("Difference: $%.2f\n", total_balance - expected_total_balance);
     printf("Total transactions processed: %d\n", total_transactions);
     
-    if (total_balance != (NUM_ACCOUNTS * INITIAL_BALANCE)) {
+    if (total_balance != expected_total_balance) {
         printf("\n*** RACE CONDITION DETECTED! ***\n");
-        printf("Balance mismatch indicates race conditions occurred!\n");
+        printf("Actual balance doesn't match expected balance!\n");
+        printf("This indicates some transactions were lost due to race conditions.\n");
+    } else {
+        printf("\nNo race condition detected this time (try running again).\n");
     }
     
     printf("\nRun this program multiple times to see different results!\n");
