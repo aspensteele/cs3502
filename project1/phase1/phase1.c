@@ -1,13 +1,16 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 #include <unistd.h>
+#include <time.h>
+#include <string.h>
+#include <errno.h>
 
-#define NUM_ACCOUNTS 1
-#define NUM_THREADS 4  
-#define TRANSACTIONS_PER_TELLER 5
-#define INITIAL_BALANCE 1000.0
+// Constants
+#define NUM_ACCOUNTS 5
+#define NUM_THREADS 4
+#define TRANSACTIONS_PER_TELLER 10
+#define INITIAL_BALANCE 1000.00
 
 // Shared data structure
 typedef struct {
@@ -19,97 +22,96 @@ typedef struct {
 // Global accounts array (shared resource)
 Account accounts[NUM_ACCOUNTS];
 
-// Global trackers for expected balance
-double total_deposits = 0.0;
-double total_withdrawals = 0.0;
-
 // Thread function
 void* teller_thread(void* arg) {
     int teller_id = *(int*)arg; // Cast void* to int* and dereference
-    unsigned int seed = time(NULL) + teller_id;
 
+    // Seed random number generator per thread
+    unsigned int seed = time(NULL) + pthread_self();
+    
     // Perform multiple transactions
     for (int i = 0; i < TRANSACTIONS_PER_TELLER; i++) {
-        // Random short pause to cause overlaps
-        usleep(rand_r(&seed) % 10000); // 0–10 ms
-
-        // Select random account 
-        int random_account = rand_r(&seed) % NUM_ACCOUNTS;
-
-        double amount;
-        if (teller_id % 2 == 0) {
-            // Even threads deposit
-            amount = (rand_r(&seed) % 901) + 100; // random 100–1000
-            double current_balance = accounts[random_account].balance;
-            usleep(rand_r(&seed) % 5000); // simulate overlap
-            accounts[random_account].balance = current_balance + amount;
-
-            // Track expected safely
-            __sync_fetch_and_add((long long*)&total_deposits, (long long)amount);
-
-            printf("Teller %d: Transaction %d - Depositing %.2f | Actual balance: %.2f\n",
-                   teller_id, i + 1, amount, accounts[random_account].balance);
-        } else {
-            // Odd threads withdraw
-            amount = (rand_r(&seed) % 451) + 50; // random 50–500
-            double current_balance = accounts[random_account].balance;
-            usleep(rand_r(&seed) % 5000); // simulate overlap
-            accounts[random_account].balance = current_balance - amount;
-
-            // Track expected safely
-            __sync_fetch_and_add((long long*)&total_withdrawals, (long long)amount);
-
-            printf("Teller %d: Transaction %d - Withdrawing %.2f | Actual balance: %.2f\n",
-                   teller_id, i + 1, amount, accounts[random_account].balance);
-        }
-
-        // Show running expected vs actual
-        double expected_so_far = INITIAL_BALANCE + total_deposits - total_withdrawals;
-        printf("   >>> Expected balance so far: %.2f\n", expected_so_far);
-
-        accounts[random_account].transaction_count++;
+        // Select random account
+        int account_id = rand_r(&seed) % NUM_ACCOUNTS;
+        
+        // Random amount between -200 and +400
+        double amount = (rand_r(&seed) % 600) - 200;
+        
+        // Perform transaction (THIS WILL HAVE RACE CONDITIONS!)
+        printf("Teller %d: Transaction %d - Account %d: %s %.2f\n", 
+               teller_id, i, account_id, 
+               amount >= 0 ? "Depositing" : "Withdrawing", 
+               amount >= 0 ? amount : -amount);
+        
+        // UNSYNCHRONIZED ACCESS - RACE CONDITION!
+        accounts[account_id].balance += amount;
+        accounts[account_id].transaction_count++;
+        
+        // Small delay to increase chance of race conditions
+        usleep(1000); // 1 millisecond
     }
 
+    printf("Teller %d: Finished all transactions\n", teller_id);
     return NULL;
 }
 
 int main() {
-    pthread_t threads[NUM_THREADS];
-    int thread_ids[NUM_THREADS];
-
+    printf("=== Phase 1: Basic Thread Operations with Race Conditions ===\n");
+    
     // Initialize accounts
+    printf("Initializing accounts with balance: $%.2f each\n", INITIAL_BALANCE);
     for (int i = 0; i < NUM_ACCOUNTS; i++) {
         accounts[i].account_id = i;
         accounts[i].balance = INITIAL_BALANCE;
         accounts[i].transaction_count = 0;
+        printf("Account %d: $%.2f\n", i, accounts[i].balance);
     }
-
-    printf("Initial balance: %.2f\n", accounts[0].balance);
-
+    
     // Create threads
+    pthread_t threads[NUM_THREADS];
+    int thread_ids[NUM_THREADS];
+    
+    printf("\nCreating %d teller threads...\n", NUM_THREADS);
+    
     for (int i = 0; i < NUM_THREADS; i++) {
         thread_ids[i] = i;
-        pthread_create(&threads[i], NULL, teller_thread, &thread_ids[i]);
+        if (pthread_create(&threads[i], NULL, teller_thread, &thread_ids[i]) != 0) {
+            perror("Failed to create thread");
+            return 1;
+        }
+        printf("Created teller thread %d\n", i);
     }
-
+    
     // Wait for all threads to complete
+    printf("\nWaiting for all threads to finish...\n");
     for (int i = 0; i < NUM_THREADS; i++) {
         pthread_join(threads[i], NULL);
+        printf("Teller %d joined\n", i);
     }
-
-    printf("Final balance: %.2f\n", accounts[0].balance);
-
-    // Expected balance = Initial + deposits – withdrawals
-    double expected_balance = INITIAL_BALANCE + total_deposits - total_withdrawals;
-    printf("Expected balance: %.2f\n", expected_balance);
-
-    if (accounts[0].balance != expected_balance) {
-        printf("RACE CONDITION DETECTED! Difference: %.2f\n",
-               expected_balance - accounts[0].balance);
+    
+    // Calculate expected final balance
+    double total_deposits_withdrawals = 0;
+    double expected_final_balance = NUM_ACCOUNTS * INITIAL_BALANCE;
+    
+    // Display final results
+    printf("\n=== Final Results ===\n");
+    printf("Expected total balance: $%.2f\n", expected_final_balance);
+    
+    double actual_total_balance = 0;
+    for (int i = 0; i < NUM_ACCOUNTS; i++) {
+        actual_total_balance += accounts[i].balance;
+        printf("Account %d: $%.2f (%d transactions)\n", 
+               i, accounts[i].balance, accounts[i].transaction_count);
+    }
+    
+    printf("\nActual total balance: $%.2f\n", actual_total_balance);
+    printf("Discrepancy: $%.2f\n", actual_total_balance - expected_final_balance);
+    
+    if (actual_total_balance != expected_final_balance) {
+        printf("RACE CONDITION DETECTED! Balances are inconsistent.\n");
     } else {
-        printf("No race condition detected this run (try running again)\n");
+        printf("No race condition detected this time (lucky timing!).\n");
     }
-
+    
     return 0;
 }
-
