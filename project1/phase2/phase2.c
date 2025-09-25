@@ -2,12 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <time.h>
 
 #define NUM_ACCOUNTS 1
-#define NUM_THREADS 10
-#define TRANSACTIONS_PER_TELLER 5
-#define INITIAL_BALANCE 1000.0
+#define NUM_THREADS 3
+#define TRANSACTIONS_PER_TELLER 3
+#define INITIAL_BALANCE 1000.0  
 
 // Account structure with mutex
 typedef struct {
@@ -18,6 +17,13 @@ typedef struct {
 } Account;
 
 Account accounts[NUM_ACCOUNTS];
+
+// Predefined transactions (same as Phase 1)
+double transactions[NUM_THREADS][TRANSACTIONS_PER_TELLER] = {
+    {150, -100, 50},   // Teller 0
+    {120, -80, 100},   // Teller 1
+    {100, -150, 200}   // Teller 2
+};
 
 // Initialize accounts and mutexes
 void initialize_accounts() {
@@ -32,24 +38,32 @@ void initialize_accounts() {
     }
 }
 
-// Deposit function (thread-safe)
-void deposit(int account_id, double amount, int thread_id) {
-    pthread_mutex_lock(&accounts[account_id].lock);
-    accounts[account_id].balance += amount;
-    accounts[account_id].transaction_count++;
-    printf("Thread %d: Deposited %.2f, New balance: %.2f\n", 
-           thread_id, amount, accounts[account_id].balance);
-    pthread_mutex_unlock(&accounts[account_id].lock);
+// Thread-safe transaction function
+void apply_transaction(int thread_id, int txn_index) {
+    int acc = 0; // Only one account for simplicity
+    double amount = transactions[thread_id][txn_index];
+
+    pthread_mutex_lock(&accounts[acc].lock);  // Enter critical section
+    double old_balance = accounts[acc].balance;
+    accounts[acc].balance += amount;
+    accounts[acc].transaction_count++;
+    pthread_mutex_unlock(&accounts[acc].lock); // Exit critical section
+
+    const char* type = (amount >= 0) ? "Deposit" : "Withdrawal";
+    printf("Thread %d: %s %+.2f (before=%.2f, after=%.2f)\n",
+           thread_id, type, amount, old_balance, accounts[acc].balance);
 }
 
-// Withdraw function (thread-safe)
-void withdraw(int account_id, double amount, int thread_id) {
-    pthread_mutex_lock(&accounts[account_id].lock);
-    accounts[account_id].balance -= amount;
-    accounts[account_id].transaction_count++;
-    printf("Thread %d: Withdrew %.2f, New balance: %.2f\n", 
-           thread_id, amount, accounts[account_id].balance);
-    pthread_mutex_unlock(&accounts[account_id].lock);
+// Thread function
+void* teller_thread(void* arg) {
+    long teller_id = (long)arg;
+
+    for (int i = 0; i < TRANSACTIONS_PER_TELLER; i++) {
+        usleep(1000); // Small delay to simulate interleaving
+        apply_transaction((int)teller_id, i);
+    }
+
+    return NULL;
 }
 
 // Cleanup mutexes
@@ -59,59 +73,43 @@ void cleanup_accounts() {
     }
 }
 
-void* teller_thread(void* arg) {
-    long teller_id = (long)arg;
-    unsigned int seed = time(NULL) + teller_id;
-    
-    for (int i = 0; i < TRANSACTIONS_PER_TELLER; i++) {
-        usleep(rand_r(&seed) % 10000);
-        
-        // FIX: Use modulo to split threads evenly between deposit/withdraw
-        if (teller_id % 2 == 0) {  // Even threads deposit
-            deposit(0, 100.0, teller_id + 1);
-        } else {                   // Odd threads withdraw
-            withdraw(0, 50.0, teller_id + 1);
-        }
-    }
-    return NULL;
-}
-
 int main() {
     pthread_t threads[NUM_THREADS];
-    
+
     initialize_accounts();
     printf("Initial balance: %.2f\n", accounts[0].balance);
-    
-    // Create threads - FIX: Pass thread ID by value, not by reference to array
-    for (int i = 0; i < NUM_THREADS; i++) {
-        // Cast int to void* to avoid thread ID race condition
-        if (pthread_create(&threads[i], NULL, teller_thread, (void*)(long)i) != 0) {
+
+    // Create threads
+    for (long i = 0; i < NUM_THREADS; i++) {
+        if (pthread_create(&threads[i], NULL, teller_thread, (void*)i) != 0) {
             perror("pthread_create failed");
             exit(EXIT_FAILURE);
         }
     }
-    
+
     // Join threads
     for (int i = 0; i < NUM_THREADS; i++) {
         pthread_join(threads[i], NULL);
     }
-    
-    printf("Final balance: %.2f\n", accounts[0].balance);
+
+    // Print final balance
+    printf("\nFinal balance: %.2f\n", accounts[0].balance);
     printf("Total transactions: %d\n", accounts[0].transaction_count);
-    
-    // Calculate expected: 5 threads * 5 transactions * $100 - 5 threads * 5 transactions * $50
-    int deposit_threads = (NUM_THREADS + 1) / 2;  // Even threads deposit (0, 2, 4...)
-    int withdraw_threads = NUM_THREADS / 2;       // Odd threads withdraw (1, 3, 5...)
-    double expected_balance = INITIAL_BALANCE + 
-                             (deposit_threads * TRANSACTIONS_PER_TELLER * 100.0) - 
-                             (withdraw_threads * TRANSACTIONS_PER_TELLER * 50.0);
-    
-    if (accounts[0].balance == expected_balance) {
-        printf("SUCCESS! Balance matches expected: %.2f\n", expected_balance);
-    } else {
-        printf("ERROR: Expected %.2f but got %.2f\n", expected_balance, accounts[0].balance);
+
+    // Calculate expected balance
+    double total_expected = INITIAL_BALANCE;
+    for (int t = 0; t < NUM_THREADS; t++) {
+        for (int j = 0; j < TRANSACTIONS_PER_TELLER; j++) {
+            total_expected += transactions[t][j];
+        }
     }
-    
+
+    if (accounts[0].balance == total_expected) {
+        printf("SUCCESS! Balance matches expected: %.2f\n", total_expected);
+    } else {
+        printf("ERROR: Expected %.2f but got %.2f\n", total_expected, accounts[0].balance);
+    }
+
     cleanup_accounts();
     return 0;
 }
