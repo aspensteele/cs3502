@@ -1,71 +1,58 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 
-#define NUM_ACCOUNTS 2
-#define NUM_THREADS 3
-#define TRANSACTIONS_PER_TELLER 3
+#define NUM_ACCOUNTS 3
+#define NUM_THREADS 4
+#define TRANSACTIONS_PER_TELLER 5
 #define INITIAL_BALANCE 1000.0
 
+// Shared data structure
 typedef struct {
     int account_id;
     double balance;
     int transaction_count;
 } Account;
 
+// Global accounts array (shared resource)
 Account accounts[NUM_ACCOUNTS];
 
-// Deterministic transactions (amounts)
-double transactions[TRANSACTIONS_PER_TELLER] = {100.0, -50.0, 200.0};
-// Mapping transactions to account index
-int transaction_accounts[TRANSACTIONS_PER_TELLER] = {0, 1, 0}; // first to acc0, second to acc1, third to acc0
-
+// Thread function
 void* teller_thread(void* arg) {
-    int teller_id = *(int*)arg;
+    int thread_id = *(int*)arg;
+
+    // Seed random number generator per thread
+    unsigned int seed = time(NULL) ^ pthread_self();
 
     for (int i = 0; i < TRANSACTIONS_PER_TELLER; i++) {
-        int acc_index = transaction_accounts[i];
-        double amount = transactions[i];
+        // Pick a random account
+        int random_account = rand_r(&seed) % NUM_ACCOUNTS;
 
-        // Read balance
-        double read_balance = accounts[acc_index].balance;
-        printf("[READ]  Teller %d, txn %d (Acc %d): read %.2f\n",
-               teller_id, i + 1, acc_index, read_balance);
-        fflush(stdout);
+        // Randomly choose deposit or withdrawal
+        int deposit = rand_r(&seed) % 2;
+        double amount = 50.0;  // fixed amount for clarity
 
-        // Small delay to encourage interleaving
-        usleep(100000);
-
-        // Detect intervening write (race)
-        double balance_before_write = accounts[acc_index].balance;
-        if (balance_before_write != read_balance) {
-            printf("  >>> INTERLEAVED (RACE) detected by Teller %d, txn %d on Acc %d: balance changed from %.2f to %.2f BEFORE write\n",
-                   teller_id, i + 1, acc_index, read_balance, balance_before_write);
-            fflush(stdout);
+        if (deposit) {
+            accounts[random_account].balance += amount;
+            printf("Thread %d: Deposited %.2f into Account %d\n",
+                   thread_id, amount, random_account);
         } else {
-            printf("  (no intervening write) Teller %d, txn %d on Acc %d\n",
-                   teller_id, i + 1, acc_index);
-            fflush(stdout);
+            accounts[random_account].balance -= amount;
+            printf("Thread %d: Withdrew %.2f from Account %d\n",
+                   thread_id, amount, random_account);
         }
 
-        // Write balance
-        double new_balance = read_balance + amount;
-        accounts[acc_index].balance = new_balance;
-        accounts[acc_index].transaction_count++;
-
-        printf("[WRITE] Teller %d, txn %d (Acc %d): amount %+7.2f, wrote %.2f\n",
-               teller_id, i + 1, acc_index, amount, new_balance);
-        fflush(stdout);
-
-        usleep(50000); // extra small delay
+        accounts[random_account].transaction_count++;
     }
 
     return NULL;
 }
 
-int main(void) {
-    srand(time(NULL));
+int main() {
+    pthread_t threads[NUM_THREADS];
+    int thread_ids[NUM_THREADS];
 
     // Initialize accounts
     for (int i = 0; i < NUM_ACCOUNTS; i++) {
@@ -74,42 +61,24 @@ int main(void) {
         accounts[i].transaction_count = 0;
     }
 
-    // Compute expected balances per account
-    double expected[NUM_ACCOUNTS];
-    for (int i = 0; i < NUM_ACCOUNTS; i++)
-        expected[i] = INITIAL_BALANCE;
-
-    for (int t = 0; t < NUM_THREADS; t++) {
-        for (int i = 0; i < TRANSACTIONS_PER_TELLER; i++) {
-            int acc_index = transaction_accounts[i];
-            expected[acc_index] += transactions[i];
-        }
-    }
-
-    printf("Initial balances:\n");
-    for (int i = 0; i < NUM_ACCOUNTS; i++)
-        printf("Account %d: %.2f\n", i, accounts[i].balance);
-    printf("\n");
-
     // Create threads
-    pthread_t threads[NUM_THREADS];
-    int thread_ids[NUM_THREADS];
     for (int i = 0; i < NUM_THREADS; i++) {
-        thread_ids[i] = i + 1;
+        thread_ids[i] = i;
         pthread_create(&threads[i], NULL, teller_thread, &thread_ids[i]);
     }
 
     // Join threads
-    for (int i = 0; i < NUM_THREADS; i++)
+    for (int i = 0; i < NUM_THREADS; i++) {
         pthread_join(threads[i], NULL);
+    }
 
-    // Check results
-    printf("\nExpected vs Actual balances per account:\n");
+    // Print final balances
+    printf("\nFinal Account Balances:\n");
     for (int i = 0; i < NUM_ACCOUNTS; i++) {
-        printf("Account %d - Expected: %.2f, Actual: %.2f\n",
-               i, expected[i], accounts[i].balance);
-        if (expected[i] != accounts[i].balance)
-            printf(">>> Race condition detected on account %d!\n", i);
+        printf("Account %d: Balance = %.2f, Transactions = %d\n",
+               accounts[i].account_id,
+               accounts[i].balance,
+               accounts[i].transaction_count);
     }
 
     return 0;
