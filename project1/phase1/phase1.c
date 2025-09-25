@@ -18,9 +18,9 @@ Account accounts[NUM_ACCOUNTS];
 
 // Predefined transactions: + = deposit, - = withdraw
 double transactions[NUM_THREADS][TRANSACTIONS_PER_TELLER] = {
-    {100, -50, 200},   // Teller 0
-    {50, 50, -100},    // Teller 1  // FIXED: added missing comma
-    {100, 50, -200}    // Teller 2  // FIXED: changed from Teller 3 to 2
+    {100, -50, 200},   // Teller 0: deposit 100, withdraw 50, deposit 200
+    {50, 50, -100},    // Teller 1: deposit 50, deposit 50, withdraw 100
+    {100, 50, -200}    // Teller 2: deposit 100, deposit 50, withdraw 200
 };
 
 void delay() {
@@ -49,27 +49,29 @@ void* teller_thread(void* arg) {
 
         // Edge case handling for non-existent accounts
         if (!is_valid_account(acc)) {
-            printf("Teller %d: ERROR - Account %d does not exist! Transaction %+.2f skipped.\n",
-                   teller_id, acc, amount);
+            printf("Teller %d: ERROR - Account %d does not exist! ", teller_id, acc);
+            printf("Transaction %+.2f skipped.\n", amount);
             continue;
         }
 
-        // Edge case handling for potential negative balances
         double old_balance = accounts[acc].balance;
-        double new_balance = old_balance + amount;
         
         // AMPLIFY THE RACE WINDOW
         delay();
         
-        accounts[acc].balance = new_balance;
+        accounts[acc].balance = old_balance + amount;
 
-        // Add warning for negative amounts and negative balances
+        // Proper transaction type labeling
+        const char* type = (amount >= 0) ? "Deposit" : "Withdrawal";
         const char* warning = "";
-        if (amount < 0) warning = " [NEGATIVE AMOUNT]";
-        if (new_balance < 0) warning = " [NEGATIVE BALANCE!]";
         
-        printf("Teller %d: %+.2f to Account %d (before=%.2f, after=%.2f)%s\n",
-               teller_id, amount, acc, old_balance, accounts[acc].balance, warning);
+        // Check for actual negative balance (overdraft) due to race conditions
+        if (accounts[acc].balance < 0) {
+            warning = " [OVERDRAFT - RACE CONDITION!]";
+        }
+        
+        printf("Teller %d: %s %+.2f to Account %d (before=%.2f, after=%.2f)%s\n",
+               teller_id, type, amount, acc, old_balance, accounts[acc].balance, warning);
 
         usleep(1000);
     }
@@ -92,8 +94,7 @@ int main() {
         }
     }
 
-    printf("=== Starting Phase 1 (Race Condition Demo with Edge Cases) ===\n");
-    printf("Testing: Negative amounts, non-existent accounts, race conditions\n\n");
+    printf("=== Phase 1 ===\n");
 
     for (int i = 0; i < NUM_THREADS; i++) {
         thread_ids[i] = i;
