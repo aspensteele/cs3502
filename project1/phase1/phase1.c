@@ -5,7 +5,7 @@
 #include <time.h>
 
 #define NUM_ACCOUNTS 1
-#define NUM_THREADS 2
+#define NUM_THREADS 5
 #define TRANSACTIONS_PER_TELLER 3
 #define INITIAL_BALANCE 1000.0
 
@@ -18,8 +18,11 @@ Account accounts[NUM_ACCOUNTS];
 
 // Predefined transactions: + = deposit, - = withdraw
 double transactions[NUM_THREADS][TRANSACTIONS_PER_TELLER] = {
-    {100, -50, 200},   // Teller 0
-    {50, 50, -100}     // Teller 1
+	  {100, -50, 200},   // Teller 0
+	  {50, 50, -100},
+          {50, 100, -100},
+	  {-200, 50, 100},
+	  {100, 100, -100}
 };
 
 // Thread function
@@ -32,13 +35,13 @@ void* teller_thread(void* arg) {
         double amount = transactions[teller_id][i];
 
         double old_balance = accounts[acc].balance;
-        // Race condition here: read-modify-write without protection
+        // Race condition here: read-modify-write without protecting
         accounts[acc].balance = old_balance + amount;
 
         printf("Teller %d: %+.2f to Account %d (before=%.2f, after=%.2f)\n",
                teller_id, amount, acc, old_balance, accounts[acc].balance);
 
-        usleep(1000); // encourage interleaving
+        usleep(10000); // encourage interleaving
     }
     return NULL;
 }
