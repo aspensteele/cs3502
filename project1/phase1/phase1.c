@@ -4,9 +4,9 @@
 #include <unistd.h>
 #include <time.h>
 
-#define NUM_ACCOUNTS 3
-#define NUM_THREADS 3
-#define TRANSACTIONS_PER_TELLER 4
+#define NUM_ACCOUNTS 1
+#define NUM_THREADS 2
+#define TRANSACTIONS_PER_TELLER 3
 #define INITIAL_BALANCE 1000.0
 
 typedef struct {
@@ -18,9 +18,8 @@ Account accounts[NUM_ACCOUNTS];
 
 // Predefined transactions: + = deposit, - = withdraw
 double transactions[NUM_THREADS][TRANSACTIONS_PER_TELLER] = {
-    {100, -50, 200, -30},   // Teller 0
-    {50, 50, -100, 25},     // Teller 1
-    {-200, 300, -50, -25}   // Teller 2
+    {100, -50, 200},   // Teller 0
+    {50, 50, -100}     // Teller 1
 };
 
 // Thread function
