@@ -4,8 +4,8 @@
 #include <unistd.h>
 #include <time.h>
 
-#define NUM_ACCOUNTS 1
-#define NUM_THREADS 2
+#define NUM_ACCOUNTS 2
+#define NUM_THREADS 3
 #define TRANSACTIONS_PER_TELLER 3
 #define INITIAL_BALANCE 1000.0
 
@@ -20,6 +20,7 @@ Account accounts[NUM_ACCOUNTS];
 double transactions[NUM_THREADS][TRANSACTIONS_PER_TELLER] = {
     {100, -50, 200},   // Teller 0
     {50, 50, -100}     // Teller 1
+    {100, 50, -200}    // Teller 3
 };
 
 // ADD THIS FUNCTION to create a delay
