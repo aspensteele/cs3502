@@ -29,20 +29,24 @@ void deposit(int account_id, double amount) {
     pthread_mutex_lock(&accounts[account_id].lock);
 
     double old_balance = accounts[account_id].balance;
+    if (amount < 0 && old_balance + amount < 0) {
+        // Reject overdraft
+        pthread_mutex_unlock(&accounts[account_id].lock);
+        printf("Withdrawal %+.2f to Account %d rejected (would overdraft)\n",
+               amount, account_id);
+        return;
+    }
+
     accounts[account_id].balance += amount;
     accounts[account_id].transaction_count++;
 
     pthread_mutex_unlock(&accounts[account_id].lock);
 
     const char* type = (amount >= 0) ? "Deposit" : "Withdrawal";
-    const char* warning = "";
-    if (accounts[account_id].balance < 0) {
-        warning = " [OVERDRAFT]";
-    }
-
-    printf("%s %+.2f to Account %d (before=%.2f, after=%.2f)%s\n",
-           type, amount, account_id, old_balance, accounts[account_id].balance, warning);
+    printf("%s %+.2f to Account %d (before=%.2f, after=%.2f)\n",
+           type, amount, account_id, old_balance, accounts[account_id].balance);
 }
+
 
 // Teller thread
 void* teller_thread(void* arg) {
