@@ -2,8 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <time.h>
 
 #define NUM_ACCOUNTS 2
+#define TRANSACTIONS_PER_TELLER 5
 
 // Account structure
 typedef struct {
@@ -16,14 +18,12 @@ Account accounts[NUM_ACCOUNTS];
 
 // Phase 4: Safe transfer function
 void safe_transfer(int from_id, int to_id, double amount) {
-    // Always lock lower ID first to prevent deadlock
     int first = (from_id < to_id) ? from_id : to_id;
     int second = (from_id < to_id) ? to_id : from_id;
 
     pthread_mutex_lock(&accounts[first].lock);
     pthread_mutex_lock(&accounts[second].lock);
 
-    // Perform transfer
     accounts[from_id].balance -= amount;
     accounts[to_id].balance += amount;
 
@@ -37,7 +37,14 @@ void safe_transfer(int from_id, int to_id, double amount) {
 // Teller thread wrapper
 void* teller_thread(void* arg) {
     int* ids = (int*)arg;
-    safe_transfer(ids[0], ids[1], 50);
+    unsigned int seed = time(NULL) ^ pthread_self();
+
+    for (int i = 0; i < TRANSACTIONS_PER_TELLER; i++) {
+        // Random amount between 1 and 100
+        double amount = (rand_r(&seed) % 100) + 1;
+        safe_transfer(ids[0], ids[1], amount);
+        usleep(100); // simulate processing delay
+    }
     return NULL;
 }
 
@@ -50,14 +57,14 @@ int main() {
     }
 
     pthread_t t1, t2;
-    int args1[2] = {0, 1}; // Transfer Account 0 -> 1
-    int args2[2] = {1, 0}; // Transfer Account 1 -> 0
+    int args1[2] = {0, 1}; // Transfers from Account 0 -> 1
+    int args2[2] = {1, 0}; // Transfers from Account 1 -> 0
 
     // Create threads
     pthread_create(&t1, NULL, teller_thread, args1);
     pthread_create(&t2, NULL, teller_thread, args2);
 
-    // Wait for threads to finish
+    // Wait for threads
     pthread_join(t1, NULL);
     pthread_join(t2, NULL);
 
