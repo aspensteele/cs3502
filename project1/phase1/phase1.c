@@ -7,7 +7,7 @@
 #define NUM_ACCOUNTS 2
 #define NUM_THREADS 3
 #define TRANSACTIONS_PER_TELLER 3
-#define INITIAL_BALANCE 200.0  // Reduced from 1000 to make overdrafts more likely
+#define INITIAL_BALANCE 1000.0
 
 typedef struct {
     int account_id;
@@ -16,18 +16,10 @@ typedef struct {
 
 Account accounts[NUM_ACCOUNTS];
 
-// Predefined transactions: + = deposit, - = withdraw
-double transactions[NUM_THREADS][TRANSACTIONS_PER_TELLER] = {
-    {-150, -100, 50},   // Teller 0: Large withdrawals first
-    {-120, -80, 100},   // Teller 1: Large withdrawals first  
-    {-100, -150, 200}   // Teller 2: Large withdrawals first
-};
-
 void delay() {
-    for (volatile int i = 0; i < 10000000; i++);  // Increased delay
+    for (volatile int i = 0; i < 10000000; i++);
 }
 
-// Edge case validation function
 int is_valid_account(int account_id) {
     return (account_id >= 0 && account_id < NUM_ACCOUNTS);
 }
@@ -39,15 +31,21 @@ void* teller_thread(void* arg) {
     for (int i = 0; i < TRANSACTIONS_PER_TELLER; i++) {
         // Test edge cases: sometimes generate invalid accounts
         int acc;
-        if (rand_r(&seed) % 5 == 0) { // 20% chance of invalid account
-            acc = NUM_ACCOUNTS + (rand_r(&seed) % 3); // Invalid account 2, 3, or 4
+        if (rand_r(&seed) % 5 == 0) {
+            acc = NUM_ACCOUNTS + (rand_r(&seed) % 3);
         } else {
-            acc = rand_r(&seed) % NUM_ACCOUNTS; // Valid account 0 or 1
+            acc = rand_r(&seed) % NUM_ACCOUNTS;
         }
         
-        double amount = transactions[teller_id][i];
+        // Random amount: multiples of 50 (range: 50 to 200)
+        int multiple = (rand_r(&seed) % 4) + 1; // 1 to 4
+        double amount = multiple * 50.0;
         
-        // Edge case handling for non-existent accounts
+        // Random operation: deposit or withdraw
+        if (rand_r(&seed) % 2 == 0) {
+            amount = -amount; // Withdrawal
+        }
+        
         if (!is_valid_account(acc)) {
             printf("Teller %d: ERROR - Account %d does not exist! ", teller_id, acc);
             printf("Transaction %+.2f skipped.\n", amount);
@@ -56,16 +54,13 @@ void* teller_thread(void* arg) {
         
         double old_balance = accounts[acc].balance;
         
-        // AMPLIFY THE RACE WINDOW
         delay();
         
         accounts[acc].balance = old_balance + amount;
         
-        // Proper transaction type labeling
         const char* type = (amount >= 0) ? "Deposit" : "Withdrawal";
         const char* warning = "";
         
-        // Check for actual negative balance (overdraft) due to race conditions
         if (accounts[acc].balance < 0) {
             warning = " [OVERDRAFT - RACE CONDITION!]";
         }
@@ -86,13 +81,6 @@ int main() {
         accounts[i].balance = INITIAL_BALANCE;
     }
     
-    double total_expected = NUM_ACCOUNTS * INITIAL_BALANCE;
-    for (int t = 0; t < NUM_THREADS; t++) {
-        for (int j = 0; j < TRANSACTIONS_PER_TELLER; j++) {
-            total_expected += transactions[t][j];
-        }
-    }
-    
     printf("=== Phase 1 ===\n");
     for (int i = 0; i < NUM_THREADS; i++) {
         thread_ids[i] = i;
@@ -110,11 +98,8 @@ int main() {
         total_actual += accounts[i].balance;
     }
     
-    printf("\nTotal money: %.2f (should be %.2f)\n", total_actual, total_expected);
-    printf("Race condition detected: %s\n", 
-           total_actual != total_expected ? "YES" : "NO");
+    printf("\nTotal money: %.2f\n", total_actual);
     
-    // Edge case summary
     for (int i = 0; i < NUM_ACCOUNTS; i++) {
         if (accounts[i].balance < 0) {
             printf("Edge Case Result: Account %d has negative balance due to race conditions!\n", i);
