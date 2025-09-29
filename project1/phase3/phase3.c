@@ -16,9 +16,9 @@ typedef struct {
 
 
 
-void transer(int from_id, int to_id, double amount) {
+void transfer(int from_id, int to_id, double amount) {
 	printf("Thread %ld: Attempting transfer from %d to %d\n",
-	      pthread_self()m, from_id, to_id); 
+	      pthread_self(), from_id, to_id); 
 
   	pthread_mutex_lock(&accounts[from_id].lock);
 	printf("Thread %ld: Locked account %d\n", pthread_self(), from_id);
@@ -34,14 +34,14 @@ void transer(int from_id, int to_id, double amount) {
 	accounts[to_id].balance += amount; 
 
 	pthread_mutex_unlock(&accounts[to_id].lock);
-	pthread_mutex_unlock(&accounts[from_id].lock)ll
+	pthread_mutex_unlock(&accounts[from_id].lock)
 
 }
 
 int main() {
 	
-	transfer(1,2,50)
-	transfer(2,1,50)
+	transfer(1,2,50);
+	transfer(2,1,50);
 	
 	
 return 0; 
