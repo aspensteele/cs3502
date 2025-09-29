@@ -2,114 +2,126 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <time.h>
 
-#define NUM_ACCOUNTS 1
+#define NUM_ACCOUNTS 2
 #define NUM_THREADS 3
 #define TRANSACTIONS_PER_TELLER 3
-#define INITIAL_BALANCE 1000.0  
+#define INITIAL_BALANCE 1000.0
 
-// Account structure with mutex
+// Account structure with mutex and transaction count
 typedef struct {
     int account_id;
     double balance;
     int transaction_count;
-    pthread_mutex_t lock;
+    pthread_mutex_t lock; // Mutex for this account
 } Account;
 
 Account accounts[NUM_ACCOUNTS];
 
-// Predefined transactions (same as Phase 1)
-double transactions[NUM_THREADS][TRANSACTIONS_PER_TELLER] = {
-    {150, -100, 50},   // Teller 0
-    {120, -80, 100},   // Teller 1
-    {100, -150, 200}   // Teller 2
-};
-
-// Initialize accounts and mutexes
-void initialize_accounts() {
-    for (int i = 0; i < NUM_ACCOUNTS; i++) {
-        accounts[i].account_id = i;
-        accounts[i].balance = INITIAL_BALANCE;
-        accounts[i].transaction_count = 0;
-        if (pthread_mutex_init(&accounts[i].lock, NULL) != 0) {
-            perror("Mutex init failed");
-            exit(EXIT_FAILURE);
-        }
-    }
+// Simple delay to simulate context switches
+void delay() {
+    for (volatile int i = 0; i < 10000000; i++);
 }
 
-// Thread-safe transaction function
-void apply_transaction(int thread_id, int txn_index) {
-    int acc = 0; // Only one account for simplicity
-    double amount = transactions[thread_id][txn_index];
+// Validate account ID
+int is_valid_account(int account_id) {
+    return (account_id >= 0 && account_id < NUM_ACCOUNTS);
+}
 
-    pthread_mutex_lock(&accounts[acc].lock);  // Enter critical section
-    double old_balance = accounts[acc].balance;
-    accounts[acc].balance += amount;
-    accounts[acc].transaction_count++;
-    pthread_mutex_unlock(&accounts[acc].lock); // Exit critical section
+// Thread-safe deposit/withdraw function
+void deposit(int account_id, double amount) {
+    if (pthread_mutex_lock(&accounts[account_id].lock) != 0) {
+        perror("Failed to acquire lock");
+        return;
+    }
+
+    // Critical section
+    double old_balance = accounts[account_id].balance;
+    accounts[account_id].balance += amount;
+    accounts[account_id].transaction_count++;
+
+    pthread_mutex_unlock(&accounts[account_id].lock);
 
     const char* type = (amount >= 0) ? "Deposit" : "Withdrawal";
-    printf("Thread %d: %s %+.2f (before=%.2f, after=%.2f)\n",
-           thread_id, type, amount, old_balance, accounts[acc].balance);
+    const char* warning = "";
+    if (accounts[account_id].balance < 0) {
+        warning = " [OVERDRAFT]";
+    }
+
+    printf("%s %+.2f to Account %d (before=%.2f, after=%.2f)%s\n",
+           type, amount, account_id, old_balance, accounts[account_id].balance, warning);
 }
 
-// Thread function
+// Teller thread
 void* teller_thread(void* arg) {
-    long teller_id = (long)arg;
+    int teller_id = *(int*)arg;
+    unsigned int seed = time(NULL) ^ teller_id;
 
     for (int i = 0; i < TRANSACTIONS_PER_TELLER; i++) {
-        usleep(1000); // Small delay to simulate interleaving
-        apply_transaction((int)teller_id, i);
-    }
+        int acc;
+        if (rand_r(&seed) % 5 == 0) {
+            acc = NUM_ACCOUNTS + (rand_r(&seed) % 3); // invalid account
+        } else {
+            acc = rand_r(&seed) % NUM_ACCOUNTS;
+        }
 
+        int multiple = (rand_r(&seed) % 4) + 1; // 1-4
+        double amount = multiple * 50.0;
+        if (rand_r(&seed) % 2 == 0) amount = -amount; // withdrawal
+
+        if (!is_valid_account(acc)) {
+            printf("Teller %d: ERROR - Account %d does not exist! Transaction %+.2f skipped.\n",
+                   teller_id, acc, amount);
+            continue;
+        }
+
+        deposit(acc, amount);
+        delay();
+    }
     return NULL;
-}
-
-// Cleanup mutexes
-void cleanup_accounts() {
-    for (int i = 0; i < NUM_ACCOUNTS; i++) {
-        pthread_mutex_destroy(&accounts[i].lock);
-    }
 }
 
 int main() {
     pthread_t threads[NUM_THREADS];
+    int thread_ids[NUM_THREADS];
 
-    initialize_accounts();
-    printf("Initial balance: %.2f\n", accounts[0].balance);
-
-    // Create threads
-    for (long i = 0; i < NUM_THREADS; i++) {
-        if (pthread_create(&threads[i], NULL, teller_thread, (void*)i) != 0) {
-            perror("pthread_create failed");
-            exit(EXIT_FAILURE);
-        }
+    // Initialize accounts and mutexes
+    for (int i = 0; i < NUM_ACCOUNTS; i++) {
+        accounts[i].account_id = i;
+        accounts[i].balance = INITIAL_BALANCE;
+        accounts[i].transaction_count = 0;
+        pthread_mutex_init(&accounts[i].lock, NULL);
     }
 
-    // Join threads
+    printf("=== Phase 2 (Thread-Safe with Mutexes) ===\n");
+
+    // Create threads
+    for (int i = 0; i < NUM_THREADS; i++) {
+        thread_ids[i] = i;
+        pthread_create(&threads[i], NULL, teller_thread, &thread_ids[i]);
+    }
+
+    // Wait for threads
     for (int i = 0; i < NUM_THREADS; i++) {
         pthread_join(threads[i], NULL);
     }
 
-    // Print final balance
-    printf("\nFinal balance: %.2f\n", accounts[0].balance);
-    printf("Total transactions: %d\n", accounts[0].transaction_count);
-
-    // Calculate expected balance
-    double total_expected = INITIAL_BALANCE;
-    for (int t = 0; t < NUM_THREADS; t++) {
-        for (int j = 0; j < TRANSACTIONS_PER_TELLER; j++) {
-            total_expected += transactions[t][j];
-        }
+    // Print final balances
+    double total_actual = 0;
+    printf("\nFinal Balances:\n");
+    for (int i = 0; i < NUM_ACCOUNTS; i++) {
+        printf("Account %d: %.2f (Transactions: %d)\n",
+               i, accounts[i].balance, accounts[i].transaction_count);
+        total_actual += accounts[i].balance;
     }
 
-    if (accounts[0].balance == total_expected) {
-        printf("SUCCESS! Balance matches expected: %.2f\n", total_expected);
-    } else {
-        printf("ERROR: Expected %.2f but got %.2f\n", total_expected, accounts[0].balance);
+    printf("\nTotal money: %.2f\n", total_actual);
+
+    // Destroy mutexes
+    for (int i = 0; i < NUM_ACCOUNTS; i++) {
+        pthread_mutex_destroy(&accounts[i].lock);
     }
 
-    cleanup_accounts();
     return 0;
 }
