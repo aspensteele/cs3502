@@ -24,19 +24,10 @@ void delay() {
     for (volatile int i = 0; i < 10000000; i++);
 }
 
-// Validate account ID
-int is_valid_account(int account_id) {
-    return (account_id >= 0 && account_id < NUM_ACCOUNTS);
-}
-
 // Thread-safe deposit/withdraw function
 void deposit(int account_id, double amount) {
-    if (pthread_mutex_lock(&accounts[account_id].lock) != 0) {
-        perror("Failed to acquire lock");
-        return;
-    }
+    pthread_mutex_lock(&accounts[account_id].lock);
 
-    // Critical section
     double old_balance = accounts[account_id].balance;
     accounts[account_id].balance += amount;
     accounts[account_id].transaction_count++;
@@ -59,22 +50,11 @@ void* teller_thread(void* arg) {
     unsigned int seed = time(NULL) ^ teller_id;
 
     for (int i = 0; i < TRANSACTIONS_PER_TELLER; i++) {
-        int acc;
-        if (rand_r(&seed) % 5 == 0) {
-            acc = NUM_ACCOUNTS + (rand_r(&seed) % 3); // invalid account
-        } else {
-            acc = rand_r(&seed) % NUM_ACCOUNTS;
-        }
+        int acc = rand_r(&seed) % NUM_ACCOUNTS;
 
         int multiple = (rand_r(&seed) % 4) + 1; // 1-4
         double amount = multiple * 50.0;
         if (rand_r(&seed) % 2 == 0) amount = -amount; // withdrawal
-
-        if (!is_valid_account(acc)) {
-            printf("Teller %d: ERROR - Account %d does not exist! Transaction %+.2f skipped.\n",
-                   teller_id, acc, amount);
-            continue;
-        }
 
         deposit(acc, amount);
         delay();
