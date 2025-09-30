@@ -4,8 +4,8 @@
 #include <unistd.h>
 #include <time.h>
 
-#define NUM_ACCOUNTS 2
-#define TRANSACTIONS_PER_TELLER 5
+#define NUM_ACCOUNTS 3
+#define TRANSACTIONS_PER_TELLER 20
 
 // Account structure
 typedef struct {
