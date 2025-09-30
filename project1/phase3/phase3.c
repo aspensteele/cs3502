@@ -1,73 +1,109 @@
-//Phase 3: Deadlock Creation
+// Phase 3: Deadlock Creation
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
-#include <string.h> 
-#include <errno.h>
 
 #define NUM_ACCOUNTS 2
+#define NUM_THREADS 3
+#define TRANSFERS_PER_TELLER 3
+#define INITIAL_BALANCE 1000.0
 
 typedef struct {
-	int account_id;
-	double balance;
-	int transaction_count;
-	pthread_mutex_t lock; // mutex for thus account
-} Account; 
-
+    int account_id;
+    double balance;
+    int transaction_count;
+    pthread_mutex_t lock; 
+} Account;
 
 Account accounts[NUM_ACCOUNTS];
 
+// Transfer function (deadlock-prone: locks in given order)
 void transfer(int from_id, int to_id, double amount) {
-	printf("Thread %ld: Attempting transfer from %d to %d\n",
-	      pthread_self(), from_id, to_id); 
+    printf("Thread %ld: Attempting transfer from %d to %d\n",
+           pthread_self(), from_id, to_id);
 
-  	pthread_mutex_lock(&accounts[from_id].lock);
-	printf("Thread %ld: Locked account %d\n", pthread_self(), from_id);
-	
-	//simulate processing delay - gives other thread time to create deadlock
-	usleep(100); //sleep for 100 microseconds
+    pthread_mutex_lock(&accounts[from_id].lock);
+    printf("Thread %ld: Locked account %d\n", pthread_self(), from_id);
 
-	printf("Thread %ld: Waiting for account %d\n", pthread_self(), to_id);
-	pthread_mutex_lock(&accounts[to_id].lock);
+    // small delay to make deadlock more likely
+    usleep(100);
 
-	// If we get here, no deadlock occured this time.
-	accounts[from_id].balance -= amount;
-	accounts[to_id].balance += amount; 
+    printf("Thread %ld: Waiting for account %d\n", pthread_self(), to_id);
+    pthread_mutex_lock(&accounts[to_id].lock);
 
-	pthread_mutex_unlock(&accounts[to_id].lock);
-	pthread_mutex_unlock(&accounts[from_id].lock);
+    // Perform transfer
+    if (accounts[from_id].balance >= amount) {
+        accounts[from_id].balance -= amount;
+        accounts[to_id].balance += amount;
+        accounts[from_id].transaction_count++;
+        accounts[to_id].transaction_count++;
+        printf("Thread %ld: Transfer %.2f from %d -> %d SUCCESS\n",
+               pthread_self(), amount, from_id, to_id);
+    } else {
+        printf("Thread %ld: Transfer FAILED (Insufficient funds)\n",
+               pthread_self());
+    }
 
+    pthread_mutex_unlock(&accounts[to_id].lock);
+    pthread_mutex_unlock(&accounts[from_id].lock);
 }
 
+// Teller thread
 void* teller_thread(void* arg) {
-	int* ids = (int*) arg;
-	transfer(ids[0], ids[1], 50);
-	return NULL;
-}	
+    int teller_id = *(int*)arg;
+    unsigned int seed = time(NULL) ^ teller_id;
+
+    for (int i = 0; i < TRANSFERS_PER_TELLER; i++) {
+        int from = rand_r(&seed) % NUM_ACCOUNTS;
+        int to = (from + 1) % NUM_ACCOUNTS; // always transfer to "other" account
+        transfer(from, to, 50.0);
+        usleep(500); // allow interleaving
+    }
+
+    return NULL;
+}
 
 int main() {
-	//initialize accounts
-	for(int i = 0; i < NUM_ACCOUNTS; i++) {
-	   accounts[i].account_id = i;
-	   accounts[i].balance = 1000;
-	   pthread_mutex_init(&accounts[i].lock, NULL);
-	}
-	
-	pthread_t t1,t2;
-	int args1[2] = {0,1};
- 	int args2[2] = {1,0};
+    pthread_t threads[NUM_THREADS];
+    int thread_ids[NUM_THREADS];
 
-	pthread_create(&t1, NULL, teller_thread, args1);
-	pthread_create(&t2, NULL, teller_thread, args2);
+    // Initialize accounts
+    for (int i = 0; i < NUM_ACCOUNTS; i++) {
+        accounts[i].account_id = i;
+        accounts[i].balance = INITIAL_BALANCE;
+        accounts[i].transaction_count = 0;
+        pthread_mutex_init(&accounts[i].lock, NULL);
+    }
 
-	pthread_join(t1,NULL);	
-	pthread_join(t2,NULL);
-		
-	printf("Final Balances: Account 0:  %2f, Account 1: %.2f\n",
-		accounts[0].balance, accounts[1].balance);
+    printf("=== Phase 3 (Deadlock Creation) ===\n");
 
-	
-return 0; 
+    // Create teller threads
+    for (int i = 0; i < NUM_THREADS; i++) {
+        thread_ids[i] = i;
+        pthread_create(&threads[i], NULL, teller_thread, &thread_ids[i]);
+    }
+
+    // Wait for threads to complete
+    for (int i = 0; i < NUM_THREADS; i++) {
+        pthread_join(threads[i], NULL);
+    }
+
+    // Print final balances
+    double total_actual = 0;
+    printf("\nFinal Balances:\n");
+    for (int i = 0; i < NUM_ACCOUNTS; i++) {
+        printf("Account %d: %.2f (Transactions: %d)\n",
+               i, accounts[i].balance, accounts[i].transaction_count);
+        total_actual += accounts[i].balance;
+    }
+    printf("Total money: %.2f\n", total_actual);
+
+    // Destroy mutexes
+    for (int i = 0; i < NUM_ACCOUNTS; i++) {
+        pthread_mutex_destroy(&accounts[i].lock);
+    }
+
+    return 0;
 }
