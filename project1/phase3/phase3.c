@@ -24,15 +24,22 @@ void transfer(int from_id, int to_id, double amount) {
     printf("Thread %ld: Attempting transfer from %d to %d of %.2f\n", pthread_self(), from_id, to_id, amount);
 
     // Lock source account
-    pthread_mutex_lock(&accounts[from_id].lock);
+    if (pthread_mutex_lock(&accounts[from_id].lock) != 0) {
+        perror("Failed to acquire lock on source account");
+        return;
+    }
     printf("Thread %ld: Locked account %d\n", pthread_self(), from_id);
 
-    // Artificial delay to increase chance of deadlock
-    usleep(100);
+    usleep(100); // delay to increase chance of deadlock
 
-    // Lock destination account
-    printf("Thread %ld: Waiting for account %d\n", pthread_self(), to_id);
-    pthread_mutex_lock(&accounts[to_id].lock);
+    // Waiting for the second account
+    printf("Thread %ld: Waiting for account %d — possible deadlock!\n", pthread_self(), to_id);
+    if (pthread_mutex_lock(&accounts[to_id].lock) != 0) {
+        perror("Failed to acquire lock on destination account");
+        pthread_mutex_unlock(&accounts[from_id].lock);
+        return;
+    }
+    printf("Thread %ld: Locked account %d\n", pthread_self(), to_id);
 
     // Perform transfer
     accounts[from_id].balance -= amount;
@@ -45,6 +52,7 @@ void transfer(int from_id, int to_id, double amount) {
 
     printf("Thread %ld: Completed transfer from %d to %d\n", pthread_self(), from_id, to_id);
 }
+
 
 void* teller_thread(void* arg) {
     int tid = *((int*)arg);
