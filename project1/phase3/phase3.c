@@ -21,7 +21,8 @@ typedef struct {
 Account accounts[NUM_ACCOUNTS];
 
 void transfer(int from_id, int to_id, double amount) {
-    printf("Thread %ld: Attempting transfer from %d to %d of %.2f\n", pthread_self(), from_id, to_id, amount);
+    printf("Thread %ld: Attempting transfer from %d to %d of %.2f\n",
+           pthread_self(), from_id, to_id, amount);
 
     // Lock source account
     if (pthread_mutex_lock(&accounts[from_id].lock) != 0) {
@@ -32,13 +33,24 @@ void transfer(int from_id, int to_id, double amount) {
 
     usleep(100); // delay to increase chance of deadlock
 
-    // Waiting for the second account
-    printf("Thread %ld: Waiting for account %d — possible deadlock!\n", pthread_self(), to_id);
-    if (pthread_mutex_lock(&accounts[to_id].lock) != 0) {
+    // Prepare timeout for the second lock
+    struct timespec timeout;
+    clock_gettime(CLOCK_REALTIME, &timeout);
+    timeout.tv_sec += 1; // 1 second timeout
+
+    printf("Thread %ld: Waiting for account %d...\n", pthread_self(), to_id);
+    int rc = pthread_mutex_timedlock(&accounts[to_id].lock, &timeout);
+    if (rc == ETIMEDOUT) {
+        printf("Thread %ld: Possible deadlock! Could not lock account %d\n",
+               pthread_self(), to_id);
+        pthread_mutex_unlock(&accounts[from_id].lock); // release first lock
+        return;
+    } else if (rc != 0) {
         perror("Failed to acquire lock on destination account");
         pthread_mutex_unlock(&accounts[from_id].lock);
         return;
     }
+
     printf("Thread %ld: Locked account %d\n", pthread_self(), to_id);
 
     // Perform transfer
@@ -50,9 +62,9 @@ void transfer(int from_id, int to_id, double amount) {
     pthread_mutex_unlock(&accounts[to_id].lock);
     pthread_mutex_unlock(&accounts[from_id].lock);
 
-    printf("Thread %ld: Completed transfer from %d to %d\n", pthread_self(), from_id, to_id);
+    printf("Thread %ld: Completed transfer from %d to %d\n",
+           pthread_self(), from_id, to_id);
 }
-
 
 void* teller_thread(void* arg) {
     int tid = *((int*)arg);
@@ -100,10 +112,12 @@ int main() {
     printf("\nFinal balances:\n");
     double total = 0;
     for (int i = 0; i < NUM_ACCOUNTS; i++) {
-        printf("Account %d: %.2f (Transactions: %d)\n", i, accounts[i].balance, accounts[i].transaction_count);
+        printf("Account %d: %.2f (Transactions: %d)\n",
+               i, accounts[i].balance, accounts[i].transaction_count);
         total += accounts[i].balance;
     }
     printf("Total balance: %.2f\n", total);
 
     return 0;
 }
+
