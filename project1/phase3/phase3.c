@@ -105,5 +105,10 @@ int main() {
     }
     printf("Total balance: %.2f\n", total);
 
+    // Destroy mutexes before exit
+    for (int i = 0; i < NUM_ACCOUNTS; i++) {
+        pthread_mutex_destroy(&accounts[i].lock);
+    }
+
     return 0;
 }
