@@ -6,9 +6,9 @@
 #include <string.h> // For strerror()
 #include <errno.h>  // For error codes
 
-#define NUM_ACCOUNTS 2
+#define NUM_ACCOUNTS 3
 #define NUM_THREADS 2
-#define TRANSACTIONS_PER_THREAD 5
+#define TRANSACTIONS_PER_THREAD 10
 #define BALANCE_INIT 1000.0
 
 typedef struct {
@@ -60,10 +60,26 @@ void* teller_thread(void* arg) {
 
     for (int i = 0; i < TRANSACTIONS_PER_THREAD; i++) {
         int from = rand_r(&seed) % NUM_ACCOUNTS;
-        int to = (from + 1) % NUM_ACCOUNTS; // pick the other account
+        int to;
+        // Ensure from != to
+        do {
+            to = rand_r(&seed) % NUM_ACCOUNTS;
+        } while (to == from);
+
         double amount = ((double)rand_r(&seed) / RAND_MAX) * 100.0;
 
-    safe_transfer(tid, from, to, amount);
+        // Prevent overdraft: skip if insufficient funds
+        pthread_mutex_lock(&accounts[from].lock);
+        int can_transfer = accounts[from].balance >= amount;
+        pthread_mutex_unlock(&accounts[from].lock);
+
+        if (!can_transfer) {
+            printf("Thread %d: Skipping transfer %d -> %d of %.2f due to insufficient funds\n",
+                tid, from, to, amount);
+            continue;
+        }
+
+        safe_transfer(tid, from, to, amount);
         usleep(rand_r(&seed) % 1000);
     }
 
@@ -109,6 +125,5 @@ int main() {
     for (int i = 0; i < NUM_ACCOUNTS; i++) {
         pthread_mutex_destroy(&accounts[i].lock);
     }
-
     return 0;
 }
