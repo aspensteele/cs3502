@@ -5,8 +5,7 @@ It simulates bank accounts and teller threads performing transfers, showing how 
 
 ---
 
-## 🚀 Overview
-We implement four phases:
+Four phases:
 
 1. **Phase 1 – No Synchronization**
    - Multiple threads update accounts simultaneously without protection.
