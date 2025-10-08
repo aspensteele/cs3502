@@ -19,24 +19,31 @@ typedef struct {
 Account accounts[NUM_ACCOUNTS];
 
 void transfer(int from_id, int to_id, double amount) {
-    // Always lock accounts in consistent order
     int first = (from_id < to_id) ? from_id : to_id;
     int second = (from_id < to_id) ? to_id : from_id;
 
     pthread_mutex_lock(&accounts[first].lock);
     pthread_mutex_lock(&accounts[second].lock);
 
-    // Check for sufficient funds
     if (accounts[from_id].balance >= amount) {
+        double before_from = accounts[from_id].balance;
+        double before_to = accounts[to_id].balance;
+
         accounts[from_id].balance -= amount;
         accounts[to_id].balance += amount;
         accounts[from_id].transaction_count++;
         accounts[to_id].transaction_count++;
+
+        printf("Thread %ld: Transfer %.2f from Account %d (%.2f -> %.2f) to Account %d (%.2f -> %.2f)\n",
+               pthread_self(), amount,
+               from_id, before_from, accounts[from_id].balance,
+               to_id, before_to, accounts[to_id].balance);
     }
 
     pthread_mutex_unlock(&accounts[second].lock);
     pthread_mutex_unlock(&accounts[first].lock);
 }
+
 
 void* teller_thread(void* arg) {
     int tid = *((int*)arg);
