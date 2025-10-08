@@ -3,8 +3,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
-#include <string.h> // For strerror()
-#include <errno.h>  // For error codes
+#include <string.h>   // For strerror()
+#include <errno.h>    // For error codes
+#include <sys/time.h> // For timing
 
 #define NUM_ACCOUNTS 2
 #define TRANSACTIONS_PER_TELLER 5
@@ -16,14 +17,22 @@ typedef struct {
     int account_id;
     double balance;
     int transaction_count;
-    pthread_mutex_t lock;  // mutex for Phase 2
+    pthread_mutex_t lock;  // mutex for each account
 } Account;
 
 // global accounts array (shared resource)
 Account accounts[NUM_ACCOUNTS];
 
-// track expected balance
+// track expected balance with its own mutex
 double expected_balance = NUM_ACCOUNTS * BALANCE_INIT;
+pthread_mutex_t expected_balance_lock = PTHREAD_MUTEX_INITIALIZER;
+
+// timing function
+double get_time() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_sec + tv.tv_usec / 1000000.0;
+}
 
 void* teller_thread(void* arg) {
     int teller_id = *((int*)arg);
@@ -53,9 +62,6 @@ void* teller_thread(void* arg) {
         accounts[random_account].balance = after;
         accounts[random_account].transaction_count++;
 
-        // safely update expected balance
-        expected_balance += amount;
-
         if (amount >= 0) {
             printf("Thread %d: Depositing  %.2f into Account %d (Before: %.2f -> After: %.2f)\n",
                    teller_id, amount, random_account, before, after);
@@ -65,6 +71,11 @@ void* teller_thread(void* arg) {
         }
 
         pthread_mutex_unlock(&accounts[random_account].lock);
+
+        // safely update expected balance with separate lock
+        pthread_mutex_lock(&expected_balance_lock);
+        expected_balance += amount;
+        pthread_mutex_unlock(&expected_balance_lock);
     }
 
     return NULL;
@@ -82,10 +93,16 @@ int main() {
         pthread_mutex_init(&accounts[i].lock, NULL);
     }
 
+    printf("=== Phase 2: Multi-threaded Banking with Mutexes ===\n");
+
     printf("Initial balances:\n");
     for (int i = 0; i < NUM_ACCOUNTS; i++) {
         printf("Account %d: %.2f\n", i, accounts[i].balance);
     }
+    printf("\n");
+
+    // start timing
+    double start_time = get_time();
 
     // create teller threads
     for (int i = 0; i < NUM_THREADS; i++) {
@@ -101,6 +118,9 @@ int main() {
         pthread_join(tellers[i], NULL);
     }
 
+    // end timing
+    double end_time = get_time();
+
     // print results
     printf("\nFinal balances:\n");
     double total_final = 0.0;
@@ -110,19 +130,22 @@ int main() {
         total_final += accounts[i].balance;
     }
 
-    printf("\nTotal Final Balance : %.2f\n", total_final);
+    printf("\n=== Results ===\n");
+    printf("Total Final Balance : %.2f\n", total_final);
     printf("Expected Balance    : %.2f\n", expected_balance);
+    printf("Execution Time      : %.6f seconds\n", end_time - start_time);
 
     if (total_final != expected_balance) {
-        printf("// Race condition causes inconsistent results!\n");
+        printf("// ERROR: Race condition causes inconsistent results!\n");
     } else {
-        printf("// Correct result with mutexes — no race conditions!\n");
+        printf("// SUCCESS: Correct result with mutexes — no race conditions!\n");
     }
 
     // destroy mutexes
     for (int i = 0; i < NUM_ACCOUNTS; i++) {
         pthread_mutex_destroy(&accounts[i].lock);
     }
+    pthread_mutex_destroy(&expected_balance_lock);
 
     return 0;
 }
