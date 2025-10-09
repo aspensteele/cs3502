@@ -1,1 +1,8 @@
 https://www.geeksforgeeks.org/operating-systems/introduction-of-deadlock-in-operating-system/
+https://hpc-tutorials.llnl.gov/posix/
+https://man7.org/linux/man-pages/man2/clock_gettime.2.html
+https://www.geeksforgeeks.org/cpp/how-to-measure-time-taken-by-a-program-in-c/
+https://man7.org/linux/man-pages/man3/pthread_create.3.html
+https://ocw.mit.edu/courses/6-088-introduction-to-c-memory-management-and-c-object-oriented-programming-january-iap-2010/pages/lecture-notes/
+
+Claude Code for debugging and explaining some specific concepts.
