@@ -1,4 +1,4 @@
-﻿namespace CpuScheduler
+namespace CpuScheduler
 {
     partial class CpuSchedulerForm
     {
@@ -47,6 +47,7 @@
             this.btnSetProcessCount = new System.Windows.Forms.Button();
             this.btnGenerateRandom = new System.Windows.Forms.Button();
             this.btnClearAll = new System.Windows.Forms.Button();
+            this.btnExportResults= new System.Windows.Forms.Button();
             this.btnSaveData = new System.Windows.Forms.Button();
             this.btnLoadData = new System.Windows.Forms.Button();
             this.cmbLoadExample = new System.Windows.Forms.ComboBox();
@@ -60,6 +61,8 @@
             this.btnPriority = new System.Windows.Forms.Button();
             this.btnSJF = new System.Windows.Forms.Button();
             this.btnFCFS = new System.Windows.Forms.Button();
+            this.btnSRTF = new System.Windows.Forms.Button();
+            this.btnHRRN = new System.Windows.Forms.Button();
             this.txtProcess = new System.Windows.Forms.TextBox();
             this.labelProcess = new System.Windows.Forms.Label();
             this.timer1 = new System.Windows.Forms.Timer(this.components);
@@ -298,6 +301,7 @@
             this.schedulerPanel.Controls.Add(this.btnSetProcessCount);
             this.schedulerPanel.Controls.Add(this.btnGenerateRandom);
             this.schedulerPanel.Controls.Add(this.btnClearAll);
+            this.schedulerPanel.Controls.Add(this.btnExportResults);
             this.schedulerPanel.Controls.Add(this.btnSaveData);
             this.schedulerPanel.Controls.Add(this.btnLoadData);
             this.schedulerPanel.Controls.Add(this.cmbLoadExample);
@@ -380,15 +384,30 @@
             this.cmbLoadExample.TabIndex = 24;
             this.cmbLoadExample.Visible = true;
             this.cmbLoadExample.SelectedIndexChanged += new System.EventHandler(this.LoadExample_SelectedIndexChanged);
+
+            // Create Export Results button
+            this.btnExportResults.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnExportResults.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnExportResults.Location = new System.Drawing.Point(490, 210);
+            this.btnExportResults.Name = "btnExportResults";
+            this.btnExportResults.Size = new System.Drawing.Size(120, 30);
+            this.btnExportResults.TabIndex = 25;
+            this.btnExportResults.Text = "💾 Export Results as CSV";
+            this.btnExportResults.UseVisualStyleBackColor = true;
+            this.btnExportResults.Visible = true;
+            this.btnExportResults.Click += new System.EventHandler(this.ExportResults_Click);
+
+            // 
+
             // 
             // btnSaveData
             // 
             this.btnSaveData.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.btnSaveData.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btnSaveData.Location = new System.Drawing.Point(490, 210);
+            this.btnSaveData.Location = new System.Drawing.Point(490, 250);
             this.btnSaveData.Name = "btnSaveData";
             this.btnSaveData.Size = new System.Drawing.Size(120, 30);
-            this.btnSaveData.TabIndex = 25;
+            this.btnSaveData.TabIndex = 26;
             this.btnSaveData.Text = "💾 Save as CSV";
             this.btnSaveData.UseVisualStyleBackColor = true;
             this.btnSaveData.Visible = true;
@@ -398,10 +417,10 @@
             // 
             this.btnLoadData.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.btnLoadData.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btnLoadData.Location = new System.Drawing.Point(490, 250);
+            this.btnLoadData.Location = new System.Drawing.Point(490, 290);
             this.btnLoadData.Name = "btnLoadData";
             this.btnLoadData.Size = new System.Drawing.Size(120, 30);
-            this.btnLoadData.TabIndex = 26;
+            this.btnLoadData.TabIndex = 27;
             this.btnLoadData.Text = "📂 Load CSV";
             this.btnLoadData.UseVisualStyleBackColor = true;
             this.btnLoadData.Visible = true;
@@ -415,14 +434,18 @@
             // 2. Set the button Size to (140, 50) and Margin to (10, 5, 10, 5)
             // 3. Add it to this FlowLayoutPanel using: this.algorithmButtonPanel.Controls.Add(yourNewButton);
             // 4. The FlowLayoutPanel will automatically position it and handle wrapping
-            this.algorithmButtonPanel.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
+            this.algorithmButtonPanel.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.algorithmButtonPanel.Controls.Add(this.btnFCFS);
             this.algorithmButtonPanel.Controls.Add(this.btnSJF);
             this.algorithmButtonPanel.Controls.Add(this.btnPriority);
             this.algorithmButtonPanel.Controls.Add(this.btnRoundRobin);
+            this.algorithmButtonPanel.Controls.Add(this.btnSRTF);
+            this.algorithmButtonPanel.Controls.Add(this.btnHRRN);
             this.algorithmButtonPanel.FlowDirection = System.Windows.Forms.FlowDirection.LeftToRight;
-            this.algorithmButtonPanel.Location = new System.Drawing.Point(20, 450);
+            this.algorithmButtonPanel.AutoScroll = true;
+            this.algorithmButtonPanel.Location = new System.Drawing.Point(20, 440);
             this.algorithmButtonPanel.Name = "algorithmButtonPanel";
             this.algorithmButtonPanel.Size = new System.Drawing.Size(690, 120);
             this.algorithmButtonPanel.TabIndex = 25;
@@ -444,6 +467,7 @@
             this.btnRoundRobin.UseVisualStyleBackColor = false;
             this.btnRoundRobin.Click += new System.EventHandler(this.RoundRobinButton_Click);
             // 
+
             // restartApp
             // 
             this.restartApp.BackColor = System.Drawing.SystemColors.InactiveBorder;
@@ -505,6 +529,40 @@
             this.btnFCFS.Text = "FCFS";
             this.btnFCFS.UseVisualStyleBackColor = false;
             this.btnFCFS.Click += new System.EventHandler(this.FirstComeFirstServeButton_Click);
+
+             // 
+            // btnSRTF
+            // 
+            this.btnSRTF.Enabled = true;
+            this.btnSRTF.BackColor = System.Drawing.Color.PapayaWhip;
+            this.btnSRTF.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.btnSRTF.FlatAppearance.MouseOverBackColor = System.Drawing.Color.PaleGreen;
+            this.btnSRTF.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnSRTF.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnSRTF.Margin = new System.Windows.Forms.Padding(10, 5, 10, 5);
+            this.btnSRTF.Name = "btnSRTF";
+            this.btnSRTF.Size = new System.Drawing.Size(140, 50);
+            this.btnSRTF.TabIndex = 13;
+            this.btnSRTF.Text = "SRTF";
+            this.btnSRTF.UseVisualStyleBackColor = false;
+            this.btnSRTF.Click += new System.EventHandler(this.SRTFButton_Click);
+            // 
+            // btnHRRN
+            // 
+            this.btnHRRN.Enabled = true;
+            this.btnHRRN.BackColor = System.Drawing.Color.PapayaWhip;
+            this.btnHRRN.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.btnHRRN.FlatAppearance.MouseOverBackColor = System.Drawing.Color.PaleGreen;
+            this.btnHRRN.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnHRRN.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnHRRN.Margin = new System.Windows.Forms.Padding(10, 5, 10, 5);
+            this.btnHRRN.Name = "btnHRRN";
+            this.btnHRRN.Size = new System.Drawing.Size(140, 50);
+            this.btnHRRN.TabIndex = 14;
+            this.btnHRRN.Text = "HRRN";
+            this.btnHRRN.UseVisualStyleBackColor = false;
+            this.btnHRRN.Click += new System.EventHandler(this.HRRNButton_Click);
+            
             // 
             // txtProcess
             // 
@@ -606,6 +664,8 @@
         private System.Windows.Forms.Button btnPriority;
         private System.Windows.Forms.Button btnSJF;
         private System.Windows.Forms.Button btnFCFS;
+        private System.Windows.Forms.Button btnSRTF;
+        private System.Windows.Forms.Button btnHRRN;
         public System.Windows.Forms.TextBox txtProcess;
         private System.Windows.Forms.Label labelProcess;
         private System.Windows.Forms.Panel sidePanel;
@@ -617,10 +677,12 @@
         private System.Windows.Forms.Button btnSetProcessCount;
         private System.Windows.Forms.Button btnGenerateRandom;
         private System.Windows.Forms.Button btnClearAll;
+        private System.Windows.Forms.Button btnExportResults;
         private System.Windows.Forms.Button btnSaveData;
         private System.Windows.Forms.Button btnLoadData;
         private System.Windows.Forms.ComboBox cmbLoadExample;
         private System.Windows.Forms.FlowLayoutPanel algorithmButtonPanel;
         private System.Windows.Forms.Timer timer1;
+
     }
 }
