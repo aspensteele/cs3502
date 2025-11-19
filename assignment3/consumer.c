@@ -41,68 +41,57 @@ int main(int argc, char* argv[]) {
     int consumer_id = atoi(argv[1]);
     int num_items = atoi(argv[2]);
 
-    // Register signal handlers
-    signal(SIGINT, signal_handler);
-    signal(SIGTERM, signal_handler);
+        srand(time(0) + consumer_id); // Seed random number generator
 
-    srand(time(NULL) + consumer_id * 100);
+        //shared memory setup
+        int shm_id = shmget(SHM_KEY, sizeof(shared_buffer_t), IPC_CREAT | 0666);
 
-    // Attach to shared memory
-    shm_id = shmget(SHM_KEY, sizeof(shared_buffer_t), 0666);
-    if (shm_id < 0) {
-        perror("shmget - failed");
-        exit(1);
+        if ( shm_id < 0) {
+            perror ("shmget - failed ") ;
+            exit (1) ;
+            }
+
+        shared_buffer_t * buffer = ( shared_buffer_t *) shmat ( shm_id , 0 , 0) ;
+        if ( buffer == ( void *) -1) {
+        perror ("shmat - failed ") ;
+        exit (1) ;
+        }
+        
+        // Create or open named semaphores
+        sem_t * mutex = sem_open ("/sem_mutex", O_CREAT , 0644 , 1) ;
+        sem_t * empty = sem_open ("/sem_empty", O_CREAT , 0644 , BUFFER_SIZE ) ;
+        sem_t * full = sem_open ("/sem_full", O_CREAT , 0644 , 0) ;
+
+        if ( mutex == SEM_FAILED || empty == SEM_FAILED || full == SEM_FAILED ) {
+        perror (" sem_open - failed ") ;
+        exit (1) ;
+        }
+
+        for (int i = 0; i < num_items ; i ++) {
+            sem_wait ( full ) ; // Wait for item
+            sem_wait ( mutex ) ; // Enter critical section
+
+            // Remove from buffer
+            item_t item = buffer->buffer[buffer->tail];
+            buffer->tail = (buffer->tail + 1) % BUFFER_SIZE;
+            buffer->count--;
+
+            printf(" Consumer %d: Consumed value %d from Producer %d\n",
+            consumer_id , item . value , item . producer_id ) ;
+
+            sem_post ( mutex ) ; // Exit critical section
+            sem_post ( empty ) ; // Signal slot available
+
+            usleep ( rand () % 100000) ; // Simulate work
     }
 
-    buffer = (shared_buffer_t*)shmat(shm_id, NULL, 0);
-    if (buffer == (void*)-1) {
-        perror("shmat - failed");
-        exit(1);
+        // Close semaphores
+        sem_close ( mutex ) ;
+        sem_close ( empty ) ;
+        sem_close ( full ) ;
+
+        // Detach shared memory
+        shmdt ( buffer ) ;
+
+        return 0;
     }
-
-    // Open existing semaphores
-    mutex = sem_open(SEM_MUTEX, 0);
-    empty = sem_open(SEM_EMPTY, 0);
-    full  = sem_open(SEM_FULL, 0);
-
-    if (mutex == SEM_FAILED || empty == SEM_FAILED || full == SEM_FAILED) {
-        perror("sem_open - failed");
-        cleanup();
-        exit(1);
-    }
-
-    printf("Consumer %d: Starting to consume %d items\n", consumer_id, num_items);
-
-
-    // Main consumption loop
-    for (int i = 0; i < num_items; i++) {
-
-        // Wait for an item to be available
-        sem_wait(full);
-
-        // Enter critical section
-        sem_wait(mutex);
-
-        // Remove item from circular buffer
-        item_t item = buffer->buffer[buffer->tail];
-        buffer->tail = (buffer->tail + 1) % BUFFER_SIZE;
-        buffer->count--;
-
-        printf("Consumer %d: Consumed value %d from Producer %d\n",
-            consumer_id, item.value, item.producer_id);
-
-        // Exit critical section
-        sem_post(mutex);
-
-        // Signal empty slot available
-        sem_post(empty);
-
-        // Simulate work
-        usleep(rand() % 100000);
-    }
-
-    printf("Consumer %d: Finished consuming %d items\n", consumer_id, num_items);
-
-    cleanup();
-    return 0;
-}
